@@ -21,7 +21,7 @@ const path = require('path');
 
 const SERVER_HOST =
     process.env.MINECRAFT_SERVER_HOST ||
-    'abresenpi.de';
+    'apfelsmp.de';
 
 const SERVER_PORT =
     Number(
