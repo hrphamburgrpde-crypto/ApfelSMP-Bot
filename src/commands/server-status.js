@@ -1,3 +1,4 @@
+
 const {
     SlashCommandBuilder,
     MessageFlags,
@@ -20,7 +21,7 @@ const path = require('path');
 
 const SERVER_HOST =
     process.env.MINECRAFT_SERVER_HOST ||
-    'mc.apfelsmp.de';
+    'abresenpi.de';
 
 const SERVER_PORT =
     Number(
@@ -146,30 +147,22 @@ async function getMinecraftStatus() {
 
         return {
             online: true,
-
-            players:
-                result.players?.online ?? 0,
-
-            maxPlayers:
-                result.players?.max ?? 0,
-
-            version:
-                result.version?.name ||
-                'Unbekannt',
-
-            ping:
-                result.roundTripLatency ?? 0
+            players: result.players?.online ?? 0,
+            maxPlayers: result.players?.max ?? 0,
+            version: result.version?.name || 'Unbekannt',
+            ping: result.roundTripLatency ?? 0
         };
     } catch (error) {
+        console.error(
+            `[SERVER STATUS] Verbindung zu ${SERVER_HOST}:${SERVER_PORT} fehlgeschlagen:`,
+            error.message
+        );
+
         return {
             online: false,
-
             players: 0,
-
             maxPlayers: 0,
-
             version: 'Unbekannt',
-
             ping: null
         };
     }
@@ -268,10 +261,8 @@ async function createNewServerStatusMessage(client) {
             return false;
         }
 
-        let state = loadState();
+        const state = loadState();
 
-        // Wenn bereits ein Guild-/Channel-Ziel vorhanden ist,
-        // versuchen wir diesen zuerst zu verwenden.
         let guild = null;
         let channel = null;
 
@@ -287,9 +278,6 @@ async function createNewServerStatusMessage(client) {
             }
         }
 
-        // Falls das alte Ziel nicht mehr existiert,
-        // verwenden wir den ersten Server und suchen dort
-        // einen passenden Textkanal.
         if (!guild) {
             guild = guilds.first();
         }
@@ -323,15 +311,11 @@ async function createNewServerStatusMessage(client) {
             return false;
         }
 
-        const server =
-            await getMinecraftStatus();
+        const server = await getMinecraftStatus();
 
-        const message =
-            await channel.send(
-                createServerStatusComponents(
-                    server
-                )
-            );
+        const message = await channel.send(
+            createServerStatusComponents(server)
+        );
 
         saveState({
             guildId: guild.id,
@@ -344,7 +328,6 @@ async function createNewServerStatusMessage(client) {
         );
 
         return true;
-
     } catch (error) {
         console.error(
             '[SERVER STATUS] Neue Status-Nachricht konnte nicht erstellt werden:',
@@ -362,7 +345,6 @@ async function createNewServerStatusMessage(client) {
 async function updateServerStatusMessage(client) {
     const state = loadState();
 
-    // Keine gespeicherte Nachricht vorhanden
     if (
         !state.guildId ||
         !state.channelId ||
@@ -372,101 +354,70 @@ async function updateServerStatusMessage(client) {
             '[SERVER STATUS] Keine gespeicherte Nachricht gefunden. Erstelle eine neue.'
         );
 
-        await createNewServerStatusMessage(
-            client
-        );
-
+        await createNewServerStatusMessage(client);
         return;
     }
 
     try {
-        const guild =
-            await client.guilds.fetch(
-                state.guildId
-            ).catch(() => null);
+        const guild = await client.guilds.fetch(
+            state.guildId
+        ).catch(() => null);
 
-        // Guild existiert nicht mehr
         if (!guild) {
             console.log(
                 '[SERVER STATUS] Gespeicherter Server nicht gefunden. Erstelle neuen Status.'
             );
 
             resetState();
-
-            await createNewServerStatusMessage(
-                client
-            );
-
+            await createNewServerStatusMessage(client);
             return;
         }
 
-        const channel =
-            await guild.channels.fetch(
-                state.channelId
-            ).catch(() => null);
+        const channel = await guild.channels.fetch(
+            state.channelId
+        ).catch(() => null);
 
-        // Channel existiert nicht mehr
-        if (
-            !channel ||
-            !channel.isTextBased()
-        ) {
+        if (!channel || !channel.isTextBased()) {
             console.log(
                 '[SERVER STATUS] Gespeicherter Channel nicht gefunden. Erstelle neuen Status.'
             );
 
             resetState();
-
-            await createNewServerStatusMessage(
-                client
-            );
-
+            await createNewServerStatusMessage(client);
             return;
         }
 
-        // Nachricht abrufen
-        const message =
-            await channel.messages.fetch(
-                state.messageId
-            ).catch(() => null);
+        const message = await channel.messages.fetch(
+            state.messageId
+        ).catch(() => null);
 
-        // Nachricht wurde gelöscht
         if (!message) {
             console.log(
                 '[SERVER STATUS] Alte Status-Nachricht nicht gefunden. Erstelle automatisch eine neue.'
             );
 
             resetState();
-
-            await createNewServerStatusMessage(
-                client
-            );
-
+            await createNewServerStatusMessage(client);
             return;
         }
 
-        const server =
-            await getMinecraftStatus();
+        const server = await getMinecraftStatus();
 
         await message.edit(
-            createServerStatusComponents(
-                server
-            )
+            createServerStatusComponents(server)
         );
 
         console.log(
             server.online
                 ? `[SERVER STATUS] Aktualisiert: ${server.players}/${server.maxPlayers} Spieler`
-                : '[SERVER STATUS] Server offline'
+                : `[SERVER STATUS] Server offline (${SERVER_HOST}:${SERVER_PORT})`
         );
-
     } catch (error) {
         console.error(
             '[SERVER STATUS] Aktualisierung fehlgeschlagen:',
             error
         );
 
-        // Falls Discord "Unknown Message" zurückgibt,
-        // setzen wir den gespeicherten Status zurück.
         if (
             error?.code === 10008 ||
             error?.rawError?.code === 10008
@@ -500,15 +451,11 @@ module.exports = {
             });
         }
 
-        const server =
-            await getMinecraftStatus();
+        const server = await getMinecraftStatus();
 
-        const message =
-            await interaction.channel.send(
-                createServerStatusComponents(
-                    server
-                )
-            );
+        const message = await interaction.channel.send(
+            createServerStatusComponents(server)
+        );
 
         saveState({
             guildId: interaction.guild.id,
@@ -538,26 +485,16 @@ function startServerStatusUpdater(client) {
     updaterStarted = true;
 
     console.log(
-        '[SERVER STATUS] Automatische Aktualisierung gestartet.'
+        `[SERVER STATUS] Automatische Aktualisierung gestartet. Ziel: ${SERVER_HOST}:${SERVER_PORT}`
     );
 
     const update = async () => {
-        await updateServerStatusMessage(
-            client
-        );
+        await updateServerStatusMessage(client);
     };
 
-    // Kurz nach dem Login aktualisieren
-    setTimeout(
-        update,
-        2000
-    );
+    setTimeout(update, 2000);
 
-    // Danach alle 60 Sekunden
-    setInterval(
-        update,
-        UPDATE_INTERVAL
-    );
+    setInterval(update, UPDATE_INTERVAL);
 }
 
 module.exports.startServerStatusUpdater =
